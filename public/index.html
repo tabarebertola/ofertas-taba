@@ -66,7 +66,7 @@
   <div id="status"></div>
 </header>
 <div class="adder">
-  <input id="url" type="text" placeholder="Buscá un producto o pegá un link de ML..." autocomplete="off">
+  <input id="url" type="text" placeholder="Buscá, pegá un link, o arrastrá/pegá una foto..." autocomplete="off">
   <button id="photoBtn" title="Buscar con una foto">📷</button>
   <button id="addBtn">Buscar</button>
 </div>
@@ -202,9 +202,9 @@ $('#url').addEventListener('input', () => {
 });
 
 $('#photoBtn').onclick = () => $('#photoFile').click();
-$('#photoFile').addEventListener('change', async () => {
-  const file = $('#photoFile').files[0];
-  if(!file) return;
+
+async function handlePhoto(file){
+  if(!file || !file.type || !file.type.startsWith('image/')) return;
   $('#msg').textContent = 'Mirando la foto...';
   $('#results').innerHTML = '';
   try{
@@ -231,7 +231,32 @@ $('#photoFile').addEventListener('change', async () => {
     $('#url').value = j.query;
     search(j.query);
   }catch(err){ $('#msg').textContent = 'No pude procesar esa imagen, probá con otra.'; }
+}
+
+$('#photoFile').addEventListener('change', () => {
+  handlePhoto($('#photoFile').files[0]);
   $('#photoFile').value = '';
+});
+
+// Ctrl+V en cualquier lado de la página
+document.addEventListener('paste', e => {
+  const item = [...(e.clipboardData?.items || [])].find(i => i.type.startsWith('image/'));
+  if(item){ e.preventDefault(); handlePhoto(item.getAsFile()); }
+});
+
+// Arrastrar una imagen a la página
+document.addEventListener('dragover', e => {
+  e.preventDefault();
+  document.querySelector('.adder').style.outline = '2px dashed var(--accent)';
+});
+document.addEventListener('dragleave', e => {
+  if(e.relatedTarget === null) document.querySelector('.adder').style.outline = '';
+});
+document.addEventListener('drop', e => {
+  e.preventDefault();
+  document.querySelector('.adder').style.outline = '';
+  const file = [...(e.dataTransfer?.files || [])].find(f => f.type.startsWith('image/'));
+  if(file) handlePhoto(file);
 });
 
 load();
