@@ -26,7 +26,11 @@ export default async function handler(req, res) {
     return res.status(200).json({ removed: remove });
   }
 
-  const parsed = parseMlUrl(String(url || ''));
+  const raw = String(url || '').trim();
+  // Acepta un ID de catálogo directo (viene del buscador) o un link pegado
+  const parsed = /^MLA\d+$/i.test(raw)
+    ? { id: raw.toUpperCase(), kind: 'catalog' }
+    : parseMlUrl(raw);
   if (!parsed) return res.status(400).json({ error: 'No encontré un ID de ML en ese link' });
 
   let token;
@@ -38,7 +42,10 @@ export default async function handler(req, res) {
 
   const d = await fetchProductData(parsed.id, parsed.kind, token);
   if (d.error && d.price == null) {
-    return res.status(400).json({ error: 'ML no devolvió datos: ' + d.error });
+    const friendly = String(d.error).includes('403')
+      ? 'Este link es de un vendedor solo y ML no deja seguirlo. Buscá el producto acá arriba y vigilalo desde los resultados.'
+      : 'ML no devolvió datos: ' + d.error;
+    return res.status(400).json({ error: friendly });
   }
 
   await supabase.from('products').upsert({
