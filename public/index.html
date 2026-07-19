@@ -171,10 +171,12 @@ async function search(q){
     $('#msg').textContent = 'Tocá "Vigilar" en los que te interesen:';
     $('#results').innerHTML = j.results.map(p => `
       <div class="result">
-        <img src="${p.picture||''}" alt="" loading="lazy" onerror="this.style.visibility='hidden'">
-        <div class="rtitle">${p.name}
-          <span class="rmeta">${[p.brand,p.width,p.color].filter(Boolean).join(' · ')}</span>
-        </div>
+        <a href="https://www.mercadolibre.com.ar/p/${p.id}" target="_blank" rel="noopener" style="display:contents">
+          <img src="${p.picture||''}" alt="" loading="lazy" onerror="this.style.visibility='hidden'">
+          <div class="rtitle">${p.name}
+            <span class="rmeta">${[p.brand,p.width,p.color].filter(Boolean).join(' · ')} · tocá para ver en ML</span>
+          </div>
+        </a>
         <button data-id="${p.id}">Vigilar</button>
       </div>`).join('')
       + '<button class="close" id="closeResults">cerrar resultados</button>';
