@@ -47,6 +47,16 @@
   .del:hover{color:var(--up)}
   .empty{text-align:center;color:var(--muted);padding:60px 20px;line-height:1.6}
   .spark{margin-top:6px}
+  .result{display:flex;gap:12px;align-items:center;background:var(--card);
+    border:1px dashed var(--line);border-radius:var(--radius);padding:10px 12px;margin-bottom:8px}
+  .result img{width:56px;height:56px;object-fit:contain;background:#fff;border-radius:8px;flex-shrink:0}
+  .result .rtitle{flex:1;font-size:.85rem;line-height:1.3;min-width:0}
+  .result .rmeta{display:block;color:var(--muted);font-size:.75rem;margin-top:2px}
+  .result button{background:none;border:1px solid var(--accent);color:var(--accent);
+    border-radius:999px;padding:6px 14px;font-size:.82rem;font-weight:600;cursor:pointer;flex-shrink:0}
+  .result button:disabled{opacity:.5}
+  #results .close{width:100%;text-align:center;background:none;border:0;color:var(--muted);
+    font-size:.8rem;cursor:pointer;padding:8px;margin-bottom:10px}
 </style>
 </head>
 <body>
@@ -55,10 +65,11 @@
   <div id="status"></div>
 </header>
 <div class="adder">
-  <input id="url" type="url" placeholder="Pegá un link de Mercado Libre..." autocomplete="off">
-  <button id="addBtn">Vigilar</button>
+  <input id="url" type="text" placeholder="Buscá un producto o pegá un link de ML..." autocomplete="off">
+  <button id="addBtn">Buscar</button>
 </div>
 <div id="msg"></div>
+<div id="results"></div>
 <div id="feed"></div>
 
 <script>
@@ -104,7 +115,7 @@ function card(it){
 async function load(){
   $('#status').textContent = 'cargando...';
   try{
-    const r = await fetch('/api/list');
+    const r = await fetch('/api/list?t=' + Date.now());
     const j = await r.json();
     const feed = j.feed || [];
     $('#feed').innerHTML = feed.length
@@ -124,24 +135,66 @@ async function load(){
   }
 }
 
-$('#addBtn').onclick = async () => {
-  const url = $('#url').value.trim();
-  if(!url) return;
+async function track(idOrUrl, btn){
+  if(btn){ btn.disabled = true; btn.textContent = '...'; }
   $('#msg').textContent = 'Agregando...';
   try{
     const r = await fetch('/api/add',{method:'POST',headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({url, pin: getPin()})});
+      body: JSON.stringify({url: idOrUrl, pin: getPin()})});
     const j = await r.json();
     if(!r.ok){
       if(r.status === 401){ localStorage.removeItem('pin'); }
       $('#msg').textContent = j.error || 'Error';
+      if(btn){ btn.disabled = false; btn.textContent = 'Vigilar'; }
       return;
     }
     $('#msg').textContent = 'Listo: ' + (j.title || j.added) + ' a ' + fmt(j.price);
-    $('#url').value = '';
+    if(btn){ btn.textContent = 'Vigilado'; }
     load();
+  }catch(err){
+    $('#msg').textContent = 'Error de red, probá de nuevo.';
+    if(btn){ btn.disabled = false; btn.textContent = 'Vigilar'; }
+  }
+}
+
+async function search(q){
+  $('#msg').textContent = 'Buscando "' + q + '"...';
+  $('#results').innerHTML = '';
+  try{
+    const r = await fetch('/api/search?q=' + encodeURIComponent(q));
+    const j = await r.json();
+    if(!r.ok){ $('#msg').textContent = j.error || 'Error buscando'; return; }
+    if(!j.results || !j.results.length){
+      $('#msg').textContent = 'No encontré nada con eso, probá con otras palabras.';
+      return;
+    }
+    $('#msg').textContent = 'Tocá "Vigilar" en los que te interesen:';
+    $('#results').innerHTML = j.results.map(p => `
+      <div class="result">
+        <img src="${p.picture||''}" alt="" loading="lazy" onerror="this.style.visibility='hidden'">
+        <div class="rtitle">${p.name}
+          <span class="rmeta">${[p.brand,p.width,p.color].filter(Boolean).join(' · ')}</span>
+        </div>
+        <button data-id="${p.id}">Vigilar</button>
+      </div>`).join('')
+      + '<button class="close" id="closeResults">cerrar resultados</button>';
+    document.querySelectorAll('#results .result button').forEach(b =>
+      b.onclick = () => track(b.dataset.id, b));
+    $('#closeResults').onclick = () => { $('#results').innerHTML = ''; $('#msg').textContent = ''; };
   }catch(err){ $('#msg').textContent = 'Error de red, probá de nuevo.'; }
-};
+}
+
+function go(){
+  const v = $('#url').value.trim();
+  if(!v) return;
+  if(/^https?:\/\//i.test(v) || /mercadolibre/i.test(v)) track(v);
+  else search(v);
+}
+$('#addBtn').onclick = go;
+$('#url').addEventListener('keydown', e => { if(e.key === 'Enter') go(); });
+$('#url').addEventListener('input', () => {
+  $('#addBtn').textContent = /^https?:\/\//i.test($('#url').value.trim()) ? 'Vigilar' : 'Buscar';
+});
 
 load();
 </script>
